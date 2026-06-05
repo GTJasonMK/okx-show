@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; connect-src 'self' https: wss:; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'"
+      content="default-src 'self'; connect-src 'self' https: wss:; img-src 'self' data:; style-src 'self'; script-src 'self' https://static.cloudflareinsights.com; script-src-elem 'self' https://static.cloudflareinsights.com; base-uri 'none'; form-action 'none'"
     >
     <title>OKX 账户看板</title>
     <link rel="stylesheet" href="./styles.css">
-    <script src="./okx-runtime.js" defer></script>
-    <script src="./app.js" defer></script>
+    <script src="./okx-runtime.js?v=20260606-positions-refresh" defer></script>
+    <script src="./app.js?v=20260606-positions-refresh" defer></script>
   </head>
   <body>
     <main class="app-shell">

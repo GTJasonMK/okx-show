@@ -3,6 +3,7 @@
 
   const THEME_STORAGE_KEY = "okx-dashboard.theme.v1";
   const MAX_CHART_POINTS = 240;
+  const CURRENT_POSITIONS_PATH = "/api/v5/account/positions";
 
   const okx = window.OKXRuntime;
   let config = { ...okx.DEFAULT_CONFIG };
@@ -11,10 +12,14 @@
   const state = {
     ws: null,
     heartbeatId: 0,
+    positionRefreshId: 0,
+    positionRefreshInFlight: false,
+    positionRefreshToken: 0,
     messageId: 1,
     account: {},
     balances: new Map(),
     positions: new Map(),
+    lastPositionUpdateAt: 0,
     profitSeries: [],
     stableBaseline: null,
     equityBaseline: null,
@@ -100,8 +105,8 @@
       throw new Error("当前页面不可用 Web Crypto，请通过 HTTPS 或 localhost 打开。");
     }
 
-    resetAccountState();
     closeSocket();
+    resetAccountState();
     setStatus("connecting", "连接中", `正在连接 ${okx.endpointLabel(credentials)}。`);
 
     const socket = new WebSocket(credentials.wsUrl);
@@ -153,6 +158,7 @@
         return;
       }
       stopHeartbeat();
+      stopPositionRefresh();
       state.ws = null;
       if (event.wasClean) {
         setStatus("idle", "未连接", "连接已关闭。");
@@ -164,6 +170,7 @@
 
   function closeSocket() {
     stopHeartbeat();
+    stopPositionRefresh();
     if (state.ws) {
       const socket = state.ws;
       state.ws = null;
@@ -231,6 +238,7 @@
     if (message.event === "login" && message.code === "0") {
       setStatus("connected", "已连接", "登录成功，正在订阅账户与持仓。");
       subscribePrivateChannels();
+      startPositionRefresh();
       return;
     }
 
@@ -264,6 +272,69 @@
     return [0, 2000, 3000, 4000].includes(interval) ? interval : 2000;
   }
 
+  function startPositionRefresh() {
+    stopPositionRefresh();
+
+    const refreshInterval = getPositionRefreshInterval();
+    if (refreshInterval === 0) {
+      return;
+    }
+
+    state.positionRefreshToken += 1;
+    const refreshToken = state.positionRefreshToken;
+    refreshCurrentPositions(refreshToken);
+    state.positionRefreshId = window.setInterval(
+      () => refreshCurrentPositions(refreshToken),
+      refreshInterval,
+    );
+  }
+
+  function stopPositionRefresh() {
+    if (state.positionRefreshId) {
+      window.clearInterval(state.positionRefreshId);
+      state.positionRefreshId = 0;
+    }
+    state.positionRefreshToken += 1;
+    state.positionRefreshInFlight = false;
+  }
+
+  function getPositionRefreshInterval() {
+    const interval = Number(config.positionRefreshInterval);
+    if (interval === 0) {
+      return 0;
+    }
+    if (!Number.isFinite(interval) || interval < 2000) {
+      return 2000;
+    }
+    return Math.min(interval, 60000);
+  }
+
+  async function refreshCurrentPositions(refreshToken) {
+    if (refreshToken !== state.positionRefreshToken || state.positionRefreshInFlight) {
+      return;
+    }
+
+    const credentials = okx.readCredentials(config);
+    state.positionRefreshInFlight = true;
+    try {
+      const positions = await okx.privateGet(credentials, CURRENT_POSITIONS_PATH);
+      if (refreshToken !== state.positionRefreshToken) {
+        return;
+      }
+      applyPositionsSnapshot(positions);
+      renderPositions();
+      setStatus("connected", "已连接", `当前持仓已刷新：${new Date().toLocaleTimeString()}。`);
+    } catch (error) {
+      if (refreshToken === state.positionRefreshToken) {
+        setStatus("error", "REST 错误", error.message || String(error));
+      }
+    } finally {
+      if (refreshToken === state.positionRefreshToken) {
+        state.positionRefreshInFlight = false;
+      }
+    }
+  }
+
   function applyAccountData(items) {
     for (const item of items) {
       state.account = { ...state.account, ...item };
@@ -282,6 +353,15 @@
     for (const item of message.data || []) {
       upsertPosition(item);
     }
+    markPositionsUpdated();
+  }
+
+  function applyPositionsSnapshot(items) {
+    state.positions.clear();
+    for (const item of items || []) {
+      upsertPosition(item);
+    }
+    markPositionsUpdated();
   }
 
   function applyBalanceAndPositionData(items) {
@@ -293,7 +373,14 @@
       for (const position of item.posData || []) {
         upsertPosition(position);
       }
+      if (item.posData?.length) {
+        markPositionsUpdated();
+      }
     }
+  }
+
+  function markPositionsUpdated() {
+    state.lastPositionUpdateAt = Date.now();
   }
 
   function upsertBalance(balance) {
@@ -325,6 +412,7 @@
     state.account = {};
     state.balances.clear();
     state.positions.clear();
+    state.lastPositionUpdateAt = 0;
     state.profitSeries = [];
     state.stableBaseline = null;
     state.equityBaseline = null;
@@ -646,7 +734,10 @@
       (a, b) => Number(b.notionalUsd || 0) - Number(a.notionalUsd || 0),
     );
 
-    els.positionCount.textContent = `${rows.length} 个持仓`;
+    const updatedAt = state.lastPositionUpdateAt
+      ? ` · ${new Date(state.lastPositionUpdateAt).toLocaleTimeString()}`
+      : "";
+    els.positionCount.textContent = `${rows.length} 个持仓${updatedAt}`;
     els.positionsBody.replaceChildren();
 
     if (!rows.length) {

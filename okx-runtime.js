@@ -18,6 +18,7 @@
     secretKey: "",
     profitCurrency: "USDT",
     positionUpdateInterval: 2000,
+    positionRefreshInterval: 2000,
     positionHistoryLimit: 10,
   };
 
