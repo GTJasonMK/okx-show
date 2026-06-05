@@ -19,11 +19,15 @@ window.OKX_DASHBOARD_CONFIG = {
   passphrase: "你的 Passphrase",
   secretKey: "你的 Secret Key",
   profitCurrency: "USDT",
+  // 持仓频道推送周期：0 只按持仓事件推送；2000/3000/4000 会按毫秒周期定时推送。
+  positionUpdateInterval: 2000,
   positionHistoryLimit: 10
 };
 ```
 
 `environment: "live"` 会连接 OKX 实盘私有 WebSocket；`environment: "demo"` 会连接 OKX 模拟盘私有 WebSocket。如果你显式配置了 `wsUrl` 或 `restUrl`，页面会优先使用配置里的地址。
+
+`positionUpdateInterval` 用于控制主页面持仓表的 WebSocket 推送频率，默认 2 秒。OKX 的 `positions` 频道如果设置为 `0`，只会在持仓事件发生时推送，不会定时刷新标记价和未实现盈亏。
 
 页面启动时会用 `config.js?v=当前时间戳` 加载配置，避免普通刷新继续使用浏览器缓存里的旧配置。注意：GitHub Pages 链接只能读取已经推送并部署完成的 `config.js`；本地刚改完但还没 push/deploy 的配置，不会出现在 GitHub Pages 页面里。
 

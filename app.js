@@ -244,6 +244,7 @@
   }
 
   function subscribePrivateChannels() {
+    const positionUpdateInterval = getPositionUpdateInterval();
     sendJson({
       op: "subscribe",
       args: [
@@ -251,11 +252,16 @@
         {
           channel: "positions",
           instType: "ANY",
-          extraParams: JSON.stringify({ updateInterval: "0" }),
+          extraParams: JSON.stringify({ updateInterval: String(positionUpdateInterval) }),
         },
         { channel: "balance_and_position" },
       ],
     });
+  }
+
+  function getPositionUpdateInterval() {
+    const interval = Number(config.positionUpdateInterval);
+    return [0, 2000, 3000, 4000].includes(interval) ? interval : 2000;
   }
 
   function applyAccountData(items) {

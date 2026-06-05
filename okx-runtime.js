@@ -17,6 +17,7 @@
     passphrase: "",
     secretKey: "",
     profitCurrency: "USDT",
+    positionUpdateInterval: 2000,
     positionHistoryLimit: 10,
   };
 
