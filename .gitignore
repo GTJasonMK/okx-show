@@ -1,0 +1,6 @@
+secret.txt
+.env
+.env.*
+*.local
+config1.js
+config2.js

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; connect-src 'self' https: wss:; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'"
+    >
+    <title>OKX 持仓历史</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./okx-runtime.js" defer></script>
+    <script src="./positions-history.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">OKX Private REST</p>
+          <h1>持仓历史</h1>
+        </div>
+        <div class="topbar-actions">
+          <nav class="page-tabs" aria-label="页面切换">
+            <a class="page-tab" href="./index.html">账户看板</a>
+            <a class="page-tab" href="./positions-history.html" aria-current="page">持仓历史</a>
+          </nav>
+          <button
+            class="theme-toggle"
+            id="theme-toggle"
+            type="button"
+            aria-label="切换到夜间主题"
+            aria-pressed="false"
+          >
+            <span class="theme-toggle__icon" id="theme-icon" aria-hidden="true">☾</span>
+            <span id="theme-label">夜间</span>
+          </button>
+          <div class="connection-pill" data-status="idle" id="connection-pill">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="status-label">未加载</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="history-summary" aria-label="持仓历史概览">
+        <article class="history-summary-card">
+          <span>最近记录</span>
+          <strong id="position-history-count">0</strong>
+        </article>
+        <article class="history-summary-card">
+          <span>累计已实现盈亏</span>
+          <strong id="position-history-pnl">--</strong>
+        </article>
+        <article class="history-summary-card">
+          <span>盈利 / 亏损</span>
+          <strong id="position-history-outcome">0 / 0</strong>
+        </article>
+      </section>
+
+      <section class="data-panel history-panel">
+        <div class="table-heading">
+          <div>
+            <h2>最近已结束持仓</h2>
+            <p id="position-history-summary">等待持仓历史数据</p>
+          </div>
+          <button class="secondary-button" id="refresh-history-button" type="button">刷新</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>更新时间</th>
+                <th>合约</th>
+                <th>类型</th>
+                <th>方向</th>
+                <th>平仓量</th>
+                <th>开仓均价</th>
+                <th>平仓均价</th>
+                <th>已实现盈亏</th>
+                <th>盈亏率</th>
+                <th>手续费 / 资金费 / 罚金</th>
+                <th>模式 / 杠杆</th>
+              </tr>
+            </thead>
+            <tbody id="positions-history-body">
+              <tr>
+                <td colspan="11" class="empty-cell">等待持仓历史数据</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
