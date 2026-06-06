@@ -327,6 +327,45 @@ h2 {
   padding: 18px;
 }
 
+.chart-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(112px, 0.45fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 14px;
+}
+
+.chart-field {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.chart-field span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.chart-field input,
+.chart-field select {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--text);
+  padding: 0 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.chart-field input:focus,
+.chart-field select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
 .chart-legend {
   display: flex;
   flex-wrap: wrap;
@@ -512,6 +551,14 @@ tbody tr:hover {
   .data-panel {
     grid-column: span 2;
   }
+
+  .chart-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .chart-controls .secondary-button {
+    align-self: stretch;
+  }
 }
 
 @media (max-width: 640px) {
@@ -528,7 +575,23 @@ tbody tr:hover {
   }
 
   .topbar-actions {
-    justify-content: space-between;
+    align-items: stretch;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .page-tabs {
+    width: 100%;
+  }
+
+  .page-tab {
+    flex: 1 1 0;
+  }
+
+  .theme-toggle,
+  .connection-pill {
+    flex: 1 1 calc(50% - 5px);
+    min-width: 0;
   }
 
   .data-layout {
@@ -546,6 +609,14 @@ tbody tr:hover {
 
   .chart-legend-item {
     flex: 1 1 100%;
+  }
+
+  .chart-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-controls .secondary-button {
+    width: 100%;
   }
 
   .chart-stage {

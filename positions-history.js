@@ -54,8 +54,8 @@
       return;
     }
 
-    if (!okx.hasUsableCredentials(credentials)) {
-      failLoad(new Error("config.js 缺少完整 OKX API 配置。"));
+    if (!okx.hasUsableRestAccess(credentials)) {
+      failLoad(new Error("config.js 缺少可用的 OKX REST 配置。"));
       return;
     }
 
