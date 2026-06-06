@@ -1,6 +1,8 @@
 secret.txt
 .env
 .env.*
+.dev.vars
+worker/.dev.vars
 *.local
 config1.js
 config2.js

@@ -160,15 +160,19 @@
         state.positionHistory.error = "已通过 noAutoConnect 暂停自动加载。";
         renderPositionHistory();
       }
-    } else if (okx.hasUsableWebSocketAccess(credentials)) {
-      ensureProfitChartLoaded();
-      ensurePositionHistoryLoaded();
-      await connect();
-    } else {
-      ensureProfitChartLoaded();
-      ensurePositionHistoryLoaded();
-      failConnection(new Error("config.js 缺少完整 OKX API 配置。"));
+      return;
     }
+
+    if (!okx.hasUsableCredentials(credentials)) {
+      ensureProfitChartLoaded();
+      ensurePositionHistoryLoaded();
+      failConnection(new Error("config.js 缺少可用的 Worker API 配置。"));
+      return;
+    }
+
+    ensureProfitChartLoaded();
+    ensurePositionHistoryLoaded();
+    await connect();
   }
 
   function getRouteView() {
@@ -243,10 +247,6 @@
     const credentials = okx.readCredentials(config);
     okx.validateCredentials(credentials);
 
-    if (!window.crypto?.subtle) {
-      throw new Error("当前页面不可用 Web Crypto，请通过 HTTPS 或 localhost 打开。");
-    }
-
     closeSocket();
     resetAccountState();
     state.authenticated = false;
@@ -263,15 +263,9 @@
       try {
         state.connectedAt = Date.now();
         startHeartbeat();
-        setStatus("authenticating", "认证中", "正在发送 OKX 登录签名。");
+        setStatus("authenticating", "认证中", "正在从 Worker 获取 OKX 登录签名。");
         const loginPayload = await okx.createWebSocketLoginPayload(credentials);
-        sendJson(
-          {
-            op: "login",
-            args: [loginPayload],
-          },
-          { withId: false },
-        );
+        sendJson({ op: "login", args: [loginPayload] }, { withId: false });
       } catch (error) {
         failConnection(error);
         closeSocket();
@@ -284,10 +278,9 @@
       }
     });
     socket.addEventListener("error", () => {
-      if (state.ws !== socket) {
-        return;
+      if (state.ws === socket) {
+        failConnection(new Error("WebSocket 连接发生错误。"));
       }
-      failConnection(new Error("WebSocket 连接发生错误。"));
     });
     socket.addEventListener("close", (event) => {
       if (state.ws !== socket) {
@@ -386,7 +379,6 @@
         startPositionRefresh();
         return;
       }
-
       failConnection(new Error(formatOkxEventError(message, "OKX 登录失败")));
       return;
     }
@@ -423,7 +415,6 @@
 
   function startPositionRefresh() {
     stopPositionRefresh();
-
     const refreshInterval = getPositionRefreshInterval();
     if (refreshInterval === 0) {
       return;
@@ -650,8 +641,8 @@
     renderProfitChart();
 
     const credentials = okx.readCredentials(config);
-    if (!okx.hasUsableRestAccess(credentials)) {
-      failProfitChartLoad(new Error("config.js 缺少可用的 OKX REST 配置。"), {
+    if (!okx.hasUsableCredentials(credentials)) {
+      failProfitChartLoad(new Error("config.js 缺少可用的 Worker API 配置。"), {
         preserveData: options.preserveData,
       });
       return;
@@ -927,10 +918,8 @@
       const bucket = buckets.get(bucketStart) || {
         time: Math.min(bucketStart + periodInfo.ms, endTime),
         delta: 0,
-        count: 0,
       };
       bucket.delta += record.pnl;
-      bucket.count += 1;
       buckets.set(bucketStart, bucket);
       includedRecordCount += 1;
     }
@@ -1222,11 +1211,6 @@
       fill: colors.equityFill,
       lineWidth: 2.4,
     });
-    drawSeries(ctx, series.stable, xForTime, yForValue, {
-      color: colors.stable,
-      lineDash: [6, 5],
-      lineWidth: 2,
-    });
     ctx.restore();
   }
 
@@ -1467,8 +1451,8 @@
     }
 
     const credentials = okx.readCredentials(config);
-    if (!okx.hasUsableRestAccess(credentials)) {
-      failPositionHistoryLoad(new Error("config.js 缺少可用的 OKX REST 配置。"));
+    if (!okx.hasUsableCredentials(credentials)) {
+      failPositionHistoryLoad(new Error("config.js 缺少可用的 Worker API 配置。"));
       return;
     }
 
@@ -1638,13 +1622,6 @@
     const id = String(state.messageId);
     state.messageId += 1;
     return id;
-  }
-
-  function describePush(message) {
-    const channel = message.arg?.channel || "unknown";
-    const count = Array.isArray(message.data) ? message.data.length : 0;
-    const type = message.eventType || "push";
-    return `${channel} ${type} ${count} 条`;
   }
 
   function formatSide(side) {
