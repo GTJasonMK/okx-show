@@ -83,6 +83,8 @@
   };
 
   const els = {
+    loginScreen: document.querySelector("#login-screen"),
+    dashboardShell: document.querySelector("#dashboard-shell"),
     viewEyebrow: document.querySelector("#view-eyebrow"),
     viewTitle: document.querySelector("#view-title"),
     viewLinks: document.querySelectorAll("[data-view-link]"),
@@ -167,10 +169,13 @@
   }
 
   async function boot() {
+    els.loginError.textContent = "正在加载登录配置。";
+    renderAccessState();
     setStatus("connecting", "加载配置", "正在加载最新 config.js。");
     config = await okx.loadConfig();
     state.configLoaded = true;
     const credentials = okx.readCredentials(config);
+    renderAccessState();
     renderProfitChart();
     renderPositionHistory();
 
@@ -184,16 +189,20 @@
     }
 
     if (!okx.hasUsableCredentials(credentials)) {
+      els.loginError.textContent = "config.js 缺少可用的 Worker API 配置。";
       renderAccessState();
       failConnection(new Error("config.js 缺少可用的 Worker API 配置。"));
       return;
     }
 
+    els.loginError.textContent = "正在验证登录会话。";
+    renderAccessState();
     setStatus("connecting", "验证登录", "正在验证登录会话。");
     let session;
     try {
       session = await okx.getAuthSession(credentials);
     } catch (error) {
+      els.loginError.textContent = error.message || String(error);
       renderAccessState();
       failConnection(error);
       return;
@@ -202,6 +211,7 @@
     if (!session.authenticated) {
       state.accessGranted = false;
       state.accessUser = "";
+      els.loginError.textContent = "登录后加载账户数据";
       renderAccessState();
       setStatus("idle", "待登录", "请先登录。");
       return;
@@ -715,19 +725,30 @@
   }
 
   function renderAccessState() {
-    const showLogin =
-      state.configLoaded &&
-      !state.accessGranted &&
-      !urlParams.has("noAutoConnect") &&
-      okx.hasUsableCredentials(okx.readCredentials(config));
+    const noAutoConnect = urlParams.has("noAutoConnect");
+    const credentials = state.configLoaded ? okx.readCredentials(config) : null;
+    const hasCredentials = Boolean(credentials && okx.hasUsableCredentials(credentials));
+    const showLogin = !state.accessGranted && !noAutoConnect;
+    const showDashboard = state.accessGranted || noAutoConnect;
     const loginLocked = showLogin && isClientLoginLocked();
+    const loginDisabled =
+      state.loginInFlight || loginLocked || !state.configLoaded || !hasCredentials;
+
+    els.loginScreen.classList.toggle("hidden", !showLogin);
+    els.dashboardShell.classList.toggle("hidden", !showDashboard);
     els.loginPanel.classList.toggle("hidden", !showLogin);
     els.logoutButton.classList.toggle("hidden", !state.accessGranted);
-    els.loginButton.disabled = state.loginInFlight || loginLocked;
-    els.loginUsername.disabled = state.loginInFlight || loginLocked;
-    els.loginPassword.disabled = state.loginInFlight || loginLocked;
+    els.loginButton.disabled = loginDisabled;
+    els.loginUsername.disabled = loginDisabled;
+    els.loginPassword.disabled = loginDisabled;
     if (loginLocked) {
       els.loginError.textContent = getClientLoginLockedMessage();
+    } else if (!state.configLoaded) {
+      els.loginError.textContent = "正在加载登录配置。";
+    } else if (!hasCredentials) {
+      els.loginError.textContent = "config.js 缺少可用的 Worker API 配置。";
+    } else if (state.loginInFlight) {
+      els.loginError.textContent = "正在验证账号密码。";
     }
     if (showLogin && !els.loginError.textContent) {
       els.loginError.textContent = "登录后加载账户数据";
@@ -1876,6 +1897,9 @@
   function failConnection(error) {
     state.connectionError = error.message || String(error);
     setStatus("error", "错误", state.connectionError);
+    if (!state.accessGranted) {
+      els.loginError.textContent = state.connectionError;
+    }
   }
 
   function formatOkxEventError(message, fallback) {

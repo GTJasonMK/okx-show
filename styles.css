@@ -242,20 +242,31 @@ h2 {
   background: var(--danger);
 }
 
+.login-screen {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: 32px 16px;
+}
+
 .login-panel {
-  margin-bottom: 18px;
+  width: min(100%, 420px);
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow);
-  padding: 18px;
+  padding: 22px;
 }
 
 .login-form {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) minmax(160px, 0.85fr) minmax(160px, 0.85fr) auto;
-  gap: 12px;
-  align-items: end;
+  gap: 14px;
+}
+
+.login-heading h1 {
+  margin-bottom: 8px;
+  font-size: 1.45rem;
+  line-height: 1.15;
 }
 
 .login-form p {
@@ -278,7 +289,7 @@ h2 {
 
 .login-field input {
   width: 100%;
-  min-height: 36px;
+  min-height: 42px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--field);
@@ -291,6 +302,10 @@ h2 {
 .login-field input:focus {
   border-color: var(--accent);
   outline: none;
+}
+
+.login-form .secondary-button {
+  width: 100%;
 }
 
 .chart-panel,
@@ -604,10 +619,6 @@ tbody tr:hover {
   }
 
   .chart-controls {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .login-form {
     grid-template-columns: 1fr 1fr;
   }
 

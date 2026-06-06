@@ -9,12 +9,33 @@
     >
     <title>OKX 账户看板</title>
     <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="./styles.css">
-    <script src="./okx-runtime.js?v=20260606-worker" defer></script>
-    <script src="./app.js?v=20260606-worker" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=20260606-login-shell">
+    <script src="./okx-runtime.js?v=20260606-login-shell" defer></script>
+    <script src="./app.js?v=20260606-login-shell" defer></script>
   </head>
   <body>
-    <main class="app-shell">
+    <main class="login-screen" id="login-screen">
+      <section class="login-panel" id="login-panel" aria-labelledby="login-title">
+        <form class="login-form" id="login-form">
+          <div class="login-heading">
+            <p class="eyebrow">OKX Dashboard</p>
+            <h1 id="login-title">账户看板登录</h1>
+            <p id="login-error" aria-live="polite">正在加载登录状态</p>
+          </div>
+          <label class="login-field">
+            <span>账号</span>
+            <input id="login-username" type="text" autocomplete="username" required disabled>
+          </label>
+          <label class="login-field">
+            <span>密码</span>
+            <input id="login-password" type="password" autocomplete="current-password" required disabled>
+          </label>
+          <button class="secondary-button" id="login-button" type="submit" disabled>登录</button>
+        </form>
+      </section>
+    </main>
+
+    <main class="app-shell hidden" id="dashboard-shell">
       <header class="topbar">
         <div>
           <p class="eyebrow" id="view-eyebrow">OKX Private WebSocket</p>
@@ -42,24 +63,6 @@
           </div>
         </div>
       </header>
-
-      <section class="login-panel hidden" id="login-panel" aria-labelledby="login-title">
-        <form class="login-form" id="login-form">
-          <div>
-            <h2 id="login-title">登录</h2>
-            <p id="login-error">登录后加载账户数据</p>
-          </div>
-          <label class="login-field">
-            <span>账号</span>
-            <input id="login-username" type="text" autocomplete="username" required>
-          </label>
-          <label class="login-field">
-            <span>密码</span>
-            <input id="login-password" type="password" autocomplete="current-password" required>
-          </label>
-          <button class="secondary-button" id="login-button" type="submit">登录</button>
-        </form>
-      </section>
 
       <div class="app-view" id="dashboard-view" data-view="dashboard">
         <section class="chart-panel" aria-labelledby="profit-chart-title">
