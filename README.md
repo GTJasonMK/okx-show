@@ -33,7 +33,7 @@ window.OKX_DASHBOARD_CONFIG = {
   profitCurrency: "USDT",
   profitChartRefreshInterval: 300000,
   positionUpdateInterval: 2000,
-  positionRefreshInterval: 5000,
+  positionRefreshInterval: 0,
   positionHistoryLimit: 10,
 };
 ```
@@ -44,7 +44,7 @@ window.OKX_DASHBOARD_CONFIG = {
 - `environment: "live"` 使用 OKX 实盘；`environment: "demo"` 使用模拟盘。
 - 如果使用模拟盘，`config.js` 的 `environment` 和 `worker/wrangler.toml` 的 `OKX_ENVIRONMENT` 都要设为 `demo`。
 - `profitChartRefreshInterval` 控制收益曲线自动刷新间隔，单位毫秒；`0` 表示关闭自动刷新。
-- `positionRefreshInterval` 控制当前持仓 REST 快照刷新间隔，单位毫秒；`0` 表示只用 WebSocket 推送。
+- `positionRefreshInterval` 控制当前持仓 REST 快照刷新间隔，单位毫秒；默认 `0`，表示当前持仓只用 WebSocket 推送。不要无必要开启高频 REST 轮询，否则移动网络抖动、OKX 临时失败或多端打开时会更容易看到 REST 错误。
 
 不要把 `apiKey`、`passphrase`、`secretKey` 写进 `config.js`。
 

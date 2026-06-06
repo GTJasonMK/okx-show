@@ -13,7 +13,7 @@
     profitCurrency: "USDT",
     profitChartRefreshInterval: 60000,
     positionUpdateInterval: 2000,
-    positionRefreshInterval: 2000,
+    positionRefreshInterval: 0,
     positionHistoryLimit: 10,
   };
 

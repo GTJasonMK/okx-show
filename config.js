@@ -7,6 +7,6 @@ window.OKX_DASHBOARD_CONFIG = {
   profitCurrency: "USDT",
   profitChartRefreshInterval: 300000,
   positionUpdateInterval: 2000,
-  positionRefreshInterval: 5000,
+  positionRefreshInterval: 0,
   positionHistoryLimit: 10,
 };
