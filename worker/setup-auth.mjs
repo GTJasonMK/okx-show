@@ -2,10 +2,11 @@
 import { spawnSync } from "node:child_process";
 import { pbkdf2Sync, randomBytes } from "node:crypto";
 import { dirname } from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import { fileURLToPath } from "node:url";
 import readline from "node:readline/promises";
 
-const ITERATIONS = 210000;
+const ITERATIONS = 100000;
 const HASH_LENGTH = 32;
 const workerDir = dirname(fileURLToPath(import.meta.url));
 
@@ -50,6 +51,7 @@ async function main() {
 function promptHidden(prompt) {
   return new Promise((resolve, reject) => {
     let value = "";
+    let decoder = new StringDecoder("utf8");
     const stdin = process.stdin;
     const wasRaw = stdin.isRaw;
 
@@ -68,16 +70,19 @@ function promptHidden(prompt) {
           return;
         }
         if (byte === 13 || byte === 10) {
+          value += decoder.end();
           cleanup();
           resolve(value);
           return;
         }
         if (byte === 8 || byte === 127) {
-          value = value.slice(0, -1);
+          value += decoder.end();
+          decoder = new StringDecoder("utf8");
+          value = Array.from(value).slice(0, -1).join("");
           continue;
         }
         if (byte >= 32) {
-          value += String.fromCharCode(byte);
+          value += decoder.write(Buffer.from([byte]));
         }
       }
     }

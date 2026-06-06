@@ -1,7 +1,8 @@
 const OKX_REST_BASE_URL = "https://www.okx.com";
 const WS_SIGN_PATH = "/users/self/verify";
 const AUTH_COOKIE_NAME = "okx_show_session";
-const DEFAULT_AUTH_ITERATIONS = 210000;
+const MAX_AUTH_ITERATIONS = 100000;
+const DEFAULT_AUTH_ITERATIONS = MAX_AUTH_ITERATIONS;
 const DEFAULT_SESSION_TTL_SECONDS = 12 * 60 * 60;
 const LOGIN_DAILY_FAILURE_LIMIT = 5;
 const BEIJING_TIME_OFFSET_MS = 8 * 60 * 60 * 1000;
@@ -249,7 +250,7 @@ function readAuthConfig(env) {
     passwordHash,
     salt,
     sessionSecret,
-    iterations: clampNumber(iterations, 100000, 1000000),
+    iterations: clampNumber(iterations, 100000, MAX_AUTH_ITERATIONS),
     sessionTtlSeconds: clampNumber(sessionTtlSeconds, 900, 7 * 24 * 60 * 60),
   };
 }
