@@ -2,6 +2,10 @@ name = "okx-show-api"
 main = "worker.js"
 compatibility_date = "2026-06-06"
 
+[[routes]]
+pattern = "okx-api.imggb.top"
+custom_domain = true
+
 [vars]
 OKX_ENVIRONMENT = "demo"
 ALLOWED_ORIGINS = "https://okx.imggb.top,https://gtjasonmk.github.io,http://127.0.0.1:8080,http://localhost:8080"

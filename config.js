@@ -3,7 +3,7 @@
 window.OKX_DASHBOARD_CONFIG = {
   environment: "demo", // live | demo；必须和 Worker 的 OKX_ENVIRONMENT 保持一致。
   wsUrl: "",
-  apiBaseUrl: "https://okx-show-api.walshlilias.workers.dev",
+  apiBaseUrl: "https://okx-api.imggb.top",
   profitCurrency: "USDT",
   profitChartRefreshInterval: 300000,
   positionUpdateInterval: 2000,

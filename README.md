@@ -29,7 +29,7 @@ Worker 当前只开放页面需要的接口：
 window.OKX_DASHBOARD_CONFIG = {
   environment: "demo", // live | demo；必须和 Worker 的 OKX_ENVIRONMENT 保持一致。
   wsUrl: "",
-  apiBaseUrl: "https://okx-show-api.walshlilias.workers.dev",
+  apiBaseUrl: "https://okx-api.imggb.top",
   profitCurrency: "USDT",
   profitChartRefreshInterval: 300000,
   positionUpdateInterval: 2000,
@@ -40,7 +40,7 @@ window.OKX_DASHBOARD_CONFIG = {
 
 说明：
 
-- `apiBaseUrl` 填 Worker 部署后的 origin，例如 `https://okx-show-api.username.workers.dev`，不要带结尾 `/`。
+- `apiBaseUrl` 填 Worker 部署后的 origin，例如 `https://okx-api.imggb.top`，不要带结尾 `/`。生产环境建议使用和前端同站的自定义 API 子域，避免移动端浏览器拦截 `workers.dev` 第三方 Cookie 后登录态丢失。
 - `environment: "live"` 使用 OKX 实盘；`environment: "demo"` 使用模拟盘。
 - 如果使用模拟盘，`config.js` 的 `environment` 和 `worker/wrangler.toml` 的 `OKX_ENVIRONMENT` 都要设为 `demo`。
 - `profitChartRefreshInterval` 控制收益曲线自动刷新间隔，单位毫秒；`0` 表示关闭自动刷新。
@@ -51,6 +51,14 @@ window.OKX_DASHBOARD_CONFIG = {
 ## Worker 部署
 
 Worker 代码在 `worker/` 目录。
+
+生产环境 Worker 绑定到自定义 API 域名：
+
+```toml
+[[routes]]
+pattern = "okx-api.imggb.top"
+custom_domain = true
+```
 
 先把 `worker/wrangler.toml` 里的 `ALLOWED_ORIGINS` 改成你的前端来源。这里只能写 origin，不能写路径：
 
