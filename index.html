@@ -35,12 +35,31 @@
             <span class="theme-toggle__icon" id="theme-icon" aria-hidden="true">☾</span>
             <span id="theme-label">夜间</span>
           </button>
+          <button class="secondary-button hidden" id="logout-button" type="button">退出</button>
           <div class="connection-pill" data-status="idle" id="connection-pill">
             <span class="status-dot" aria-hidden="true"></span>
             <span id="status-label">未连接</span>
           </div>
         </div>
       </header>
+
+      <section class="login-panel hidden" id="login-panel" aria-labelledby="login-title">
+        <form class="login-form" id="login-form">
+          <div>
+            <h2 id="login-title">登录</h2>
+            <p id="login-error">登录后加载账户数据</p>
+          </div>
+          <label class="login-field">
+            <span>账号</span>
+            <input id="login-username" type="text" autocomplete="username" required>
+          </label>
+          <label class="login-field">
+            <span>密码</span>
+            <input id="login-password" type="password" autocomplete="current-password" required>
+          </label>
+          <button class="secondary-button" id="login-button" type="submit">登录</button>
+        </form>
+      </section>
 
       <div class="app-view" id="dashboard-view" data-view="dashboard">
         <section class="chart-panel" aria-labelledby="profit-chart-title">

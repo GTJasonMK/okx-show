@@ -64,6 +64,7 @@
     validateCredentials(credentials);
     const response = await fetch(`${credentials.apiBaseUrl}/api/okx/ws-login`, {
       cache: "no-store",
+      credentials: "include",
       headers: { Accept: "application/json" },
       method: "POST",
     });
@@ -87,6 +88,7 @@
     const requestPath = createRequestPath(path, params);
     const response = await fetch(`${credentials.apiBaseUrl}${requestPath}`, {
       cache: "no-store",
+      credentials: "include",
       headers: { Accept: "application/json" },
     });
     const payload = await parseJsonResponse(response);
@@ -97,6 +99,65 @@
       throw new Error(`${payload.code} ${payload.msg || "OKX REST 请求失败"}`.trim());
     }
     return Array.isArray(payload.data) ? payload.data : [];
+  }
+
+  async function getAuthSession(credentials) {
+    validateApiBaseUrl(credentials);
+    const response = await fetch(`${credentials.apiBaseUrl}/api/auth/session`, {
+      cache: "no-store",
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    });
+    const payload = await parseJsonResponse(response);
+    if (response.status === 401) {
+      return { authenticated: false };
+    }
+    if (!response.ok) {
+      throw new Error(formatHttpError("登录会话 Worker", response, payload));
+    }
+    return {
+      authenticated: Boolean(payload.authenticated),
+      username: String(payload.username || ""),
+      expiresAt: Number(payload.expiresAt || 0),
+    };
+  }
+
+  async function login(credentials, username, password) {
+    validateApiBaseUrl(credentials);
+    const response = await fetch(`${credentials.apiBaseUrl}/api/auth/login`, {
+      body: JSON.stringify({ username, password }),
+      cache: "no-store",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    });
+    const payload = await parseJsonResponse(response);
+    if (!response.ok) {
+      throw createHttpError("登录 Worker", response, payload);
+    }
+    return {
+      authenticated: Boolean(payload.authenticated),
+      username: String(payload.username || ""),
+      expiresAt: Number(payload.expiresAt || 0),
+    };
+  }
+
+  async function logout(credentials) {
+    validateApiBaseUrl(credentials);
+    const response = await fetch(`${credentials.apiBaseUrl}/api/auth/logout`, {
+      cache: "no-store",
+      credentials: "include",
+      headers: { Accept: "application/json" },
+      method: "POST",
+    });
+    const payload = await parseJsonResponse(response);
+    if (!response.ok) {
+      throw new Error(formatHttpError("退出登录 Worker", response, payload));
+    }
+    return { authenticated: false };
   }
 
   function endpointLabel(credentials) {
@@ -133,6 +194,12 @@
     }
   }
 
+  function validateApiBaseUrl(credentials) {
+    if (!isValidHttpUrl(credentials.apiBaseUrl)) {
+      throw new Error("缺少 Worker API URL。");
+    }
+  }
+
   function createRequestPath(path, params) {
     const searchParams = new URLSearchParams();
     for (const [key, value] of Object.entries(params || {})) {
@@ -157,13 +224,22 @@
     return detail ? `${label} HTTP ${response.status}: ${detail}` : `${label} HTTP ${response.status}`;
   }
 
+  function createHttpError(label, response, payload) {
+    const error = new Error(formatHttpError(label, response, payload));
+    error.status = response.status;
+    return error;
+  }
+
   window.OKXRuntime = Object.freeze({
     DEFAULT_CONFIG,
     ENDPOINTS,
     createWebSocketLoginPayload,
     endpointLabel,
+    getAuthSession,
     hasUsableCredentials,
+    login,
     loadConfig,
+    logout,
     privateGet,
     readCredentials,
     validateCredentials,

@@ -242,6 +242,57 @@ h2 {
   background: var(--danger);
 }
 
+.login-panel {
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.login-form {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(160px, 0.85fr) minmax(160px, 0.85fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.login-form p {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.login-field {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.login-field span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.login-field input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--text);
+  padding: 0 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.login-field input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
 .chart-panel,
 .data-panel {
   border: 1px solid var(--line);
@@ -556,6 +607,10 @@ tbody tr:hover {
     grid-template-columns: 1fr 1fr;
   }
 
+  .login-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .chart-controls .secondary-button {
     align-self: stretch;
   }
@@ -589,9 +644,14 @@ tbody tr:hover {
   }
 
   .theme-toggle,
-  .connection-pill {
+  .connection-pill,
+  #logout-button {
     flex: 1 1 calc(50% - 5px);
     min-width: 0;
+  }
+
+  .login-form {
+    grid-template-columns: 1fr;
   }
 
   .data-layout {

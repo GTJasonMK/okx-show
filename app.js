@@ -3,6 +3,9 @@
 
   const THEME_STORAGE_KEY = "okx-dashboard.theme.v1";
   const PROFIT_CHART_RANGE_STORAGE_KEY = "okx-dashboard.profit-chart-range.v1";
+  const LOGIN_FAILURE_STORAGE_KEY = "okx-dashboard.login-failures.v1";
+  const CLIENT_LOGIN_DAILY_FAILURE_LIMIT = 5;
+  const BEIJING_TIME_OFFSET_MS = 8 * 60 * 60 * 1000;
   const CURRENT_POSITIONS_PATH = "/api/v5/account/positions";
   const HISTORY_PATH = "/api/v5/account/positions-history";
   const DEFAULT_HISTORY_LIMIT = 10;
@@ -39,6 +42,9 @@
   const state = {
     activeView: getRouteView(),
     configLoaded: false,
+    accessGranted: false,
+    accessUser: "",
+    loginInFlight: false,
     ws: null,
     authenticated: false,
     connectionError: "",
@@ -87,6 +93,13 @@
     themeToggle: document.querySelector("#theme-toggle"),
     themeIcon: document.querySelector("#theme-icon"),
     themeLabel: document.querySelector("#theme-label"),
+    logoutButton: document.querySelector("#logout-button"),
+    loginPanel: document.querySelector("#login-panel"),
+    loginForm: document.querySelector("#login-form"),
+    loginUsername: document.querySelector("#login-username"),
+    loginPassword: document.querySelector("#login-password"),
+    loginError: document.querySelector("#login-error"),
+    loginButton: document.querySelector("#login-button"),
     profitChartControls: document.querySelector("#profit-chart-controls"),
     profitStartInput: document.querySelector("#profit-start-input"),
     profitEndInput: document.querySelector("#profit-end-input"),
@@ -144,6 +157,13 @@
     els.refreshHistoryButton.addEventListener("click", () => {
       loadPositionHistory({ force: true });
     });
+    els.loginForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitLogin();
+    });
+    els.logoutButton.addEventListener("click", () => {
+      logout();
+    });
   }
 
   async function boot() {
@@ -164,15 +184,118 @@
     }
 
     if (!okx.hasUsableCredentials(credentials)) {
-      ensureProfitChartLoaded();
-      ensurePositionHistoryLoaded();
+      renderAccessState();
       failConnection(new Error("config.js 缺少可用的 Worker API 配置。"));
       return;
     }
 
+    setStatus("connecting", "验证登录", "正在验证登录会话。");
+    let session;
+    try {
+      session = await okx.getAuthSession(credentials);
+    } catch (error) {
+      renderAccessState();
+      failConnection(error);
+      return;
+    }
+
+    if (!session.authenticated) {
+      state.accessGranted = false;
+      state.accessUser = "";
+      renderAccessState();
+      setStatus("idle", "待登录", "请先登录。");
+      return;
+    }
+
+    state.accessGranted = true;
+    state.accessUser = session.username;
+    renderAccessState();
+    await startAuthenticatedSession();
+  }
+
+  async function startAuthenticatedSession() {
     ensureProfitChartLoaded();
     ensurePositionHistoryLoaded();
     await connect();
+  }
+
+  async function submitLogin() {
+    if (!state.configLoaded || state.loginInFlight) {
+      return;
+    }
+
+    if (isClientLoginLocked()) {
+      failLogin(new Error(getClientLoginLockedMessage()));
+      return;
+    }
+
+    const credentials = okx.readCredentials(config);
+    if (!okx.hasUsableCredentials(credentials)) {
+      failLogin(new Error("config.js 缺少可用的 Worker API 配置。"));
+      return;
+    }
+
+    state.loginInFlight = true;
+    renderAccessState();
+    setStatus("connecting", "登录中", "正在验证账号密码。");
+    try {
+      const session = await okx.login(
+        credentials,
+        els.loginUsername.value.trim(),
+        els.loginPassword.value,
+      );
+      if (!session.authenticated) {
+        throw new Error("登录失败。");
+      }
+      els.loginPassword.value = "";
+      clearClientLoginFailures();
+      state.accessGranted = true;
+      state.accessUser = session.username;
+      state.loginInFlight = false;
+      renderAccessState();
+      await startAuthenticatedSession();
+    } catch (error) {
+      state.loginInFlight = false;
+      if (error.status === 401) {
+        const failure = recordClientLoginFailure();
+        if (failure.locked) {
+          failLogin(new Error(getClientLoginLockedMessage()));
+          return;
+        }
+      } else if (error.status === 429) {
+        lockClientLoginForToday();
+        failLogin(new Error(getClientLoginLockedMessage()));
+        return;
+      }
+      failLogin(error);
+    }
+  }
+
+  function failLogin(error) {
+    state.accessGranted = false;
+    state.accessUser = "";
+    els.loginError.textContent = error.message || String(error);
+    renderAccessState();
+    setStatus("error", "登录失败", els.loginError.textContent);
+  }
+
+  async function logout() {
+    const credentials = okx.readCredentials(config);
+    try {
+      if (okx.hasUsableCredentials(credentials)) {
+        await okx.logout(credentials);
+      }
+    } catch {
+      // Local logout still clears protected data even if the network request fails.
+    }
+    closeSocket();
+    resetProtectedData();
+    state.accessGranted = false;
+    state.accessUser = "";
+    state.authenticated = false;
+    renderAccessState();
+    render();
+    setStatus("idle", "已退出", "已退出登录。");
   }
 
   function getRouteView() {
@@ -556,11 +679,137 @@
     render();
   }
 
+  function resetProtectedData() {
+    stopProfitChartAutoRefresh();
+    stopPositionRefresh();
+    state.account = {};
+    state.balances.clear();
+    state.positions.clear();
+    state.lastPositionUpdateAt = 0;
+    Object.assign(state.profitChart, {
+      records: [],
+      points: [],
+      error: "",
+      loading: false,
+      loaded: false,
+      includedRecordCount: 0,
+      excludedCurrencyCount: 0,
+      invalidPnlCount: 0,
+      pageCount: 0,
+      truncated: false,
+    });
+    Object.assign(state.positionHistory, {
+      records: [],
+      error: "",
+      loading: false,
+      loaded: false,
+    });
+  }
+
   function render() {
+    renderAccessState();
     renderProfitChart();
     renderBalances();
     renderPositions();
     renderPositionHistory();
+  }
+
+  function renderAccessState() {
+    const showLogin =
+      state.configLoaded &&
+      !state.accessGranted &&
+      !urlParams.has("noAutoConnect") &&
+      okx.hasUsableCredentials(okx.readCredentials(config));
+    const loginLocked = showLogin && isClientLoginLocked();
+    els.loginPanel.classList.toggle("hidden", !showLogin);
+    els.logoutButton.classList.toggle("hidden", !state.accessGranted);
+    els.loginButton.disabled = state.loginInFlight || loginLocked;
+    els.loginUsername.disabled = state.loginInFlight || loginLocked;
+    els.loginPassword.disabled = state.loginInFlight || loginLocked;
+    if (loginLocked) {
+      els.loginError.textContent = getClientLoginLockedMessage();
+    }
+    if (showLogin && !els.loginError.textContent) {
+      els.loginError.textContent = "登录后加载账户数据";
+    }
+    if (state.accessGranted) {
+      els.loginError.textContent = "";
+    }
+  }
+
+  function isClientLoginLocked() {
+    return readClientLoginFailures().count >= CLIENT_LOGIN_DAILY_FAILURE_LIMIT;
+  }
+
+  function recordClientLoginFailure() {
+    const failure = readClientLoginFailures();
+    const nextFailure = {
+      dayKey: getClientLoginDayKey(),
+      count: Math.min(failure.count + 1, CLIENT_LOGIN_DAILY_FAILURE_LIMIT),
+    };
+    writeClientLoginFailures(nextFailure);
+    return {
+      count: nextFailure.count,
+      locked: nextFailure.count >= CLIENT_LOGIN_DAILY_FAILURE_LIMIT,
+    };
+  }
+
+  function lockClientLoginForToday() {
+    writeClientLoginFailures({
+      dayKey: getClientLoginDayKey(),
+      count: CLIENT_LOGIN_DAILY_FAILURE_LIMIT,
+    });
+  }
+
+  function clearClientLoginFailures() {
+    try {
+      localStorage.removeItem(LOGIN_FAILURE_STORAGE_KEY);
+    } catch {
+      // localStorage can be unavailable in restricted browser modes.
+    }
+  }
+
+  function readClientLoginFailures() {
+    const dayKey = getClientLoginDayKey();
+    try {
+      const raw = localStorage.getItem(LOGIN_FAILURE_STORAGE_KEY);
+      if (!raw) {
+        return { count: 0, dayKey };
+      }
+      const parsed = JSON.parse(raw);
+      if (parsed?.dayKey !== dayKey) {
+        clearClientLoginFailures();
+        return { count: 0, dayKey };
+      }
+      return {
+        dayKey,
+        count: Math.max(0, Math.min(Number(parsed.count) || 0, CLIENT_LOGIN_DAILY_FAILURE_LIMIT)),
+      };
+    } catch {
+      return { count: 0, dayKey };
+    }
+  }
+
+  function writeClientLoginFailures(failure) {
+    try {
+      localStorage.setItem(
+        LOGIN_FAILURE_STORAGE_KEY,
+        JSON.stringify({
+          dayKey: failure.dayKey,
+          count: failure.count,
+        }),
+      );
+    } catch {
+      // localStorage can be unavailable in restricted browser modes.
+    }
+  }
+
+  function getClientLoginDayKey() {
+    return new Date(Date.now() + BEIJING_TIME_OFFSET_MS).toISOString().slice(0, 10);
+  }
+
+  function getClientLoginLockedMessage() {
+    return "密码错误次数已达 5 次，今日前端已停止发送登录请求。";
   }
 
   function initializeProfitChartControls() {
@@ -591,7 +840,7 @@
   }
 
   function ensureProfitChartLoaded() {
-    if (state.activeView !== "dashboard" || !state.configLoaded) {
+    if (state.activeView !== "dashboard" || !state.configLoaded || !state.accessGranted) {
       return;
     }
     if (state.profitChart.loaded || state.profitChart.loading) {
@@ -602,6 +851,12 @@
 
   async function loadProfitChart(options = {}) {
     if (!state.configLoaded) {
+      return;
+    }
+    if (!state.accessGranted) {
+      failProfitChartLoad(new Error("请先登录。"), {
+        preserveData: true,
+      });
       return;
     }
     if (!options.force && (state.profitChart.loaded || state.profitChart.loading)) {
@@ -972,6 +1227,7 @@
       !urlParams.has("noAutoConnect") &&
       state.activeView === "dashboard" &&
       state.configLoaded &&
+      state.accessGranted &&
       state.profitChart.loaded &&
       !state.profitChart.loading &&
       state.profitChart.endTime === null;
@@ -1070,6 +1326,9 @@
     if (chart.error) {
       return chart.error;
     }
+    if (state.configLoaded && !state.accessGranted && !urlParams.has("noAutoConnect")) {
+      return "登录后加载历史收益数据";
+    }
     if (chart.loading) {
       return `正在拉取持仓历史 · ${formatChartRangeLabel()}`;
     }
@@ -1107,6 +1366,9 @@
     if (chart.error) {
       return chart.error;
     }
+    if (state.configLoaded && !state.accessGranted && !urlParams.has("noAutoConnect")) {
+      return "登录后加载历史收益数据";
+    }
     if (chart.loading) {
       return "正在拉取持仓历史";
     }
@@ -1117,10 +1379,11 @@
   }
 
   function setProfitChartControlsDisabled(disabled) {
-    els.profitStartInput.disabled = disabled;
-    els.profitEndInput.disabled = disabled;
-    els.profitPeriodSelect.disabled = disabled;
-    els.loadProfitChartButton.disabled = disabled || !state.configLoaded;
+    const shouldDisable = disabled || !state.configLoaded || !state.accessGranted;
+    els.profitStartInput.disabled = shouldDisable;
+    els.profitEndInput.disabled = shouldDisable;
+    els.profitPeriodSelect.disabled = shouldDisable;
+    els.loadProfitChartButton.disabled = shouldDisable;
   }
 
   function formatChartRangeLabel() {
@@ -1433,7 +1696,7 @@
   }
 
   function ensurePositionHistoryLoaded() {
-    if (state.activeView !== "positions-history" || !state.configLoaded) {
+    if (state.activeView !== "positions-history" || !state.configLoaded || !state.accessGranted) {
       return;
     }
     if (state.positionHistory.loaded || state.positionHistory.loading) {
@@ -1444,6 +1707,10 @@
 
   async function loadPositionHistory(options = {}) {
     if (!state.configLoaded) {
+      return;
+    }
+    if (!state.accessGranted) {
+      failPositionHistoryLoad(new Error("请先登录。"));
       return;
     }
     if (!options.force && (state.positionHistory.loaded || state.positionHistory.loading)) {
@@ -1520,10 +1787,13 @@
     els.positionHistoryCount.textContent = String(records.length);
     setSignedValue(els.positionHistoryPnl, pnlValues.length ? totalPnl : NaN);
     els.positionHistoryOutcome.textContent = `${winners} / ${losers}`;
-    els.refreshHistoryButton.disabled = state.positionHistory.loading || !state.configLoaded;
+    els.refreshHistoryButton.disabled =
+      state.positionHistory.loading || !state.configLoaded || !state.accessGranted;
 
     if (state.positionHistory.error) {
       els.positionHistorySummary.textContent = state.positionHistory.error;
+    } else if (state.configLoaded && !state.accessGranted && !urlParams.has("noAutoConnect")) {
+      els.positionHistorySummary.textContent = "登录后加载持仓历史";
     } else if (state.positionHistory.loading) {
       els.positionHistorySummary.textContent = "正在拉取最近持仓历史";
     } else {

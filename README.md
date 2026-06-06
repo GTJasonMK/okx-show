@@ -12,9 +12,14 @@ OKX 账户看板采用“GitHub Pages 静态前端 + 独立 Cloudflare Worker AP
 
 Worker 当前只开放页面需要的接口：
 
+- `GET /api/auth/session`：检查看板登录会话。
+- `POST /api/auth/login`：验证看板账号密码并设置 HttpOnly 会话 Cookie。
+- `POST /api/auth/logout`：清除会话 Cookie。
 - `POST /api/okx/ws-login`：返回 OKX WebSocket 登录参数。
 - `GET /api/v5/account/positions`：读取当前持仓快照。
 - `GET /api/v5/account/positions-history`：读取最近三个月内的已结束持仓历史。
+
+所有 OKX 私有接口都会先校验看板登录会话。未登录用户只能调用认证接口，不会触发 OKX REST 转发或 WebSocket 登录签名。
 
 ## 前端配置
 
@@ -22,13 +27,13 @@ Worker 当前只开放页面需要的接口：
 
 ```js
 window.OKX_DASHBOARD_CONFIG = {
-  environment: "live", // live | demo；必须和 Worker 的 OKX_ENVIRONMENT 保持一致。
+  environment: "demo", // live | demo；必须和 Worker 的 OKX_ENVIRONMENT 保持一致。
   wsUrl: "",
-  apiBaseUrl: "https://your-worker.example.workers.dev",
+  apiBaseUrl: "https://okx-show-api.walshlilias.workers.dev",
   profitCurrency: "USDT",
-  profitChartRefreshInterval: 60000,
+  profitChartRefreshInterval: 300000,
   positionUpdateInterval: 2000,
-  positionRefreshInterval: 2000,
+  positionRefreshInterval: 5000,
   positionHistoryLimit: 10,
 };
 ```
@@ -51,8 +56,8 @@ Worker 代码在 `worker/` 目录。
 
 ```toml
 [vars]
-OKX_ENVIRONMENT = "live"
-ALLOWED_ORIGINS = "https://yourname.github.io,http://127.0.0.1:8080,http://localhost:8080"
+OKX_ENVIRONMENT = "demo"
+ALLOWED_ORIGINS = "https://okx.imggb.top,https://gtjasonmk.github.io,http://127.0.0.1:8080,http://localhost:8080"
 ```
 
 如果 GitHub Pages 地址是 `https://yourname.github.io/okx-show/`，这里仍然写 `https://yourname.github.io`。如果你使用自定义域名，把自定义域名 origin 也加进去。
@@ -73,6 +78,35 @@ wrangler deploy
 - `OKX_SECRET_KEY` 也可以写成 `OKX_API_SECRET`。
 
 本地调试 Worker 时可以使用 `worker/.dev.vars`，该文件已被 `.gitignore` 忽略。
+
+## 看板登录
+
+看板登录由 Worker 校验，不在前端保存账号密码。密码不会以明文保存到仓库或 Worker；本项目使用 PBKDF2-SHA256 哈希、随机盐和独立会话签名密钥。
+
+首次配置或重置登录账号时，在本地终端运行：
+
+```bash
+cd worker
+node setup-auth.mjs
+wrangler deploy
+```
+
+脚本会交互输入账号和密码，密码输入不会回显。脚本会写入这些 Worker secrets：
+
+- `DASHBOARD_AUTH_USERNAME`
+- `DASHBOARD_AUTH_SALT`
+- `DASHBOARD_AUTH_PASSWORD_HASH`
+- `DASHBOARD_AUTH_ITERATIONS`
+- `DASHBOARD_SESSION_SECRET`
+
+登录成功后 Worker 会设置 `HttpOnly; Secure; SameSite=None` 的会话 Cookie。前端 JavaScript 不能读取该 Cookie，只能在请求 Worker 时由浏览器自动携带。退出登录会清除 Cookie 并清空页面里的账户、持仓、收益曲线和持仓历史数据。
+
+注意：登录可以阻止未登录用户触发 OKX 请求，但不能让恶意直连 Worker 完全零消耗。认证失败的请求不会转发到 OKX，也不会暴露数据，但这次 Worker 调用本身仍会计入 Cloudflare Workers 请求量。代码里包含两层登录失败限制：
+
+- 前端本地限制：按北京时间自然日，同一浏览器输错 5 次后，当天登录表单禁用，后续点击不会继续请求 Worker；成功登录会清空本地失败计数。
+- Worker 后端限制：按北京时间自然日，同一 IP 连续输错 5 次密码后，当天后续登录直接返回 `429`，不会校验密码，也不会转发 OKX；成功登录会清空该 IP 当天失败计数。
+
+前端本地限制只减少正常浏览器里的重复请求，不是安全边界；用户可以清浏览器存储、换浏览器或直接请求 Worker。如果需要防止恶意刷完 Workers 免费额度，应在 Worker 前面加 Cloudflare Access、WAF/Rate Limiting 或等价的边缘访问控制。
 
 ## 本地运行
 
@@ -101,7 +135,7 @@ http://127.0.0.1:8080/
 3. 把代码推送到 `main` 或 `master` 分支，GitHub 会自动发布页面。
 4. 也可以在仓库 `Actions` 页面手动运行 `Deploy GitHub Pages`。
 
-工作流只发布静态前端文件，不会发布 `worker/`，也不会发布旧的 `functions/` 或本地开发服务。
+工作流只发布静态前端文件和 `CNAME`，不会发布 `worker/`，也不会发布旧的 `functions/` 或本地开发服务。
 
 ## 数据与页面行为
 
@@ -138,7 +172,7 @@ http://127.0.0.1:8080/
 
 OKX Secret 只应放在 Cloudflare Worker secrets 中，不能进入 `config.js`、README、GitHub Actions 日志或任何前端文件。
 
-需要明确的是：CORS 不是用户鉴权。`ALLOWED_ORIGINS` 只能限制普通浏览器页面从哪些 origin 调用 Worker，不能证明访问者是你本人。如果 GitHub Pages 是公开的，任何能打开页面的人都可能看到页面展示的数据。
+需要明确的是：CORS 和看板登录都不是 DDoS 防护。`ALLOWED_ORIGINS` 只能限制普通浏览器页面从哪些 origin 调用 Worker；看板登录可以保护 OKX 数据和阻止未登录刷新，但恶意直连 Worker 仍会消耗 Worker 请求次数。
 
 更稳妥的部署方式：
 
@@ -155,4 +189,5 @@ OKX Secret 只应放在 Cloudflare Worker secrets 中，不能进入 `config.js`
 - `config.js`：前端公开配置，只放 Worker URL 和页面参数。
 - `worker/worker.js`：Cloudflare Worker API。
 - `worker/wrangler.toml`：Worker 部署配置，不放密钥。
+- `worker/setup-auth.mjs`：本地交互式看板登录密钥配置脚本。
 - `.github/workflows/pages.yml`：GitHub Pages 静态部署工作流。
